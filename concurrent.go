@@ -14,7 +14,7 @@ type Concurrent struct {
 func NewConcurrent(
 	inputChanSize int,
 	doFuncCount int,
-	doFunc func(interface{}) (interface{}, error),
+	doFunc func(interface{}) interface{},
 ) *Concurrent {
 	return NewConcurrent2(inputChanSize, doFuncCount, doFunc)
 }
@@ -35,7 +35,7 @@ func (c *Concurrent) initConcurrentItems(v ...interface{}) {
 	c.concurrentItems = []*concurrentItem{}
 	var outputChan chan interface{}
 	for i := len(v) - 1; i > -1; i -= 3 {
-		f := v[i].(func(interface{}) (interface{}, error))
+		f := v[i].(func(interface{}) interface{})
 		count := v[i-1].(int)
 		size := v[i-2].(int)
 		ch := make(chan interface{}, size)

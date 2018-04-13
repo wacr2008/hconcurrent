@@ -17,12 +17,12 @@ func TestConcurrent(t *testing.T) {
 		inputChanSize, doFuncCount, testDo,
 		inputChanSize, doFuncCount, testDo,
 		inputChanSize, doFuncCount, testDo,
-		inputChanSize, doFuncCount, func(i interface{}) (interface{}, error) {
+		inputChanSize, doFuncCount, func(i interface{}) interface{} {
 			l.Lock()
 			defer l.Unlock()
 			n := i.(int)
 			m[n] = n
-			return n, nil
+			return n
 		},
 	)
 
@@ -40,7 +40,7 @@ func TestConcurrent(t *testing.T) {
 	}
 }
 
-func testDo(i interface{}) (interface{}, error) {
+func testDo(i interface{}) interface{} {
 	n := i.(int)
-	return n + 1, nil
+	return n + 1
 }

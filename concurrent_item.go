@@ -8,14 +8,14 @@ type concurrentItem struct {
 	inputChan   chan interface{}
 	outputChan  chan interface{}
 	doFuncCount int
-	doFunc      func(interface{}) (interface{}, error)
+	doFunc      func(interface{}) interface{}
 	started     bool
 }
 
 func newConcurrentItem(
 	inputChan chan interface{},
 	doFuncCount int,
-	doFunc func(interface{}) (interface{}, error),
+	doFunc func(interface{}) interface{},
 	outputChan chan interface{},
 ) *concurrentItem {
 	return &concurrentItem{
@@ -47,8 +47,8 @@ func (ci *concurrentItem) f() {
 			ci.wait.Done()
 			return
 		}
-		i, e := ci.doFunc(v)
-		if e == nil && ci.outputChan != nil {
+		i := ci.doFunc(v)
+		if i != nil && ci.outputChan != nil {
 			ci.outputChan <- i
 		}
 	}
