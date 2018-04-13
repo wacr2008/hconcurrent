@@ -70,6 +70,15 @@ func (c *Concurrent) Input(i interface{}) {
 }
 
 func (c *Concurrent) Stop() {
+	c.lock.Lock()
+	defer c.lock.Unlock()
+	c.stop()
+}
+
+func (c *Concurrent) stop() {
+	if !c.started {
+		return
+	}
 	for _, item := range c.concurrentItems {
 		item.stop()
 	}
