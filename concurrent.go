@@ -48,16 +48,16 @@ func (c *Concurrent) initConcurrentItems(v ...interface{}) {
 	}
 }
 
-func (c *Concurrent) Do() {
+func (c *Concurrent) Run() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if !c.started {
-		c.do()
+		c.run()
 		c.started = true
 	}
 }
 
-func (c *Concurrent) do() {
+func (c *Concurrent) run() {
 	for _, item := range c.concurrentItems {
 		item.start()
 	}

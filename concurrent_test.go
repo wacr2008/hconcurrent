@@ -26,7 +26,7 @@ func TestConcurrent(t *testing.T) {
 		},
 	)
 
-	c.Do()
+	c.Run()
 	for i := 0; i < len(inputs); i++ {
 		c.Input(inputs[i])
 	}
