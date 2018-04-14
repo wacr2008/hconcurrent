@@ -1,6 +1,8 @@
 package hconcurrent
 
-import "sync"
+import (
+	"sync"
+)
 
 type concurrentItem struct {
 	lock        *sync.Mutex
@@ -28,15 +30,15 @@ func newConcurrentItem(
 	}
 }
 
-func (ci *concurrentItem) do() {
+func (ci *concurrentItem) start() {
 	ci.lock.Lock()
-	defer ci.lock.Unlock()
 	if !ci.started {
 		for i := 0; i < ci.doFuncCount; i++ {
 			go ci.f()
 		}
 		ci.started = true
 	}
+	ci.lock.Unlock()
 }
 
 func (ci *concurrentItem) f() {
@@ -56,10 +58,30 @@ func (ci *concurrentItem) f() {
 
 func (ci *concurrentItem) stop() {
 	ci.lock.Lock()
-	defer ci.lock.Unlock()
+	ci.stopNoLock()
+	ci.lock.Unlock()
+}
+
+func (ci *concurrentItem) destroy() {
+	ci.lock.Lock()
+	ci.destroyNoLock()
+	ci.lock.Unlock()
+}
+
+func (ci *concurrentItem) stopNoLock() {
+	if !ci.started {
+		return
+	}
 	for i := 0; i < ci.doFuncCount; i++ {
 		ci.inputChan <- nil
 	}
 	ci.wait.Wait()
 	ci.started = false
+}
+
+func (ci *concurrentItem) destroyNoLock() {
+	if ci.started {
+		ci.stopNoLock()
+	}
+	close(ci.inputChan)
 }
