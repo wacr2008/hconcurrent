@@ -2,6 +2,7 @@ package hconcurrent
 
 import (
 	"sync"
+	"time"
 )
 
 type Concurrent struct {
@@ -74,6 +75,27 @@ func (c *Concurrent) Input(i interface{}) bool {
 	}
 	c.concurrentItems[0].inputChan <- i
 	return true
+}
+
+func (c *Concurrent) InputWithTimeout(i interface{}, timeout time.Duration) bool {
+	return c.InputWithTimer(i, time.NewTimer(timeout))
+}
+
+func (c *Concurrent) InputWithTimer(i interface{}, t *time.Timer) bool {
+	if i == nil {
+		return true
+	}
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if !c.started {
+		return false
+	}
+	select {
+	case c.concurrentItems[0].inputChan <- i:
+		return true
+	case <-t.C:
+		return false
+	}
 }
 
 func (c *Concurrent) Stop() {

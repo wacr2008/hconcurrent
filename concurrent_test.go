@@ -3,6 +3,7 @@ package hconcurrent
 import (
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestConcurrent(t *testing.T) {
@@ -38,6 +39,18 @@ func TestConcurrent(t *testing.T) {
 		if m[n] != n {
 			t.Errorf("concurrent do error")
 		}
+	}
+}
+
+func TestConcurrentTimeout(t *testing.T) {
+	c := NewConcurrent(1, 1, func(i interface{}) interface{} {
+		time.Sleep(time.Second)
+		return nil
+	})
+	c.Input(1)
+	inputSuccess := c.InputWithTimeout(1, 100*time.Millisecond)
+	if inputSuccess == true {
+		t.Error("concurrent input with timeout error")
 	}
 }
 
