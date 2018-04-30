@@ -63,13 +63,17 @@ func (c *Concurrent) run() {
 	}
 }
 
-func (c *Concurrent) Input(i interface{}) {
+func (c *Concurrent) Input(i interface{}) bool {
 	if i == nil {
-		return
+		return true
 	}
 	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if !c.started {
+		return false
+	}
 	c.concurrentItems[0].inputChan <- i
-	c.lock.RUnlock()
+	return true
 }
 
 func (c *Concurrent) Stop() {
