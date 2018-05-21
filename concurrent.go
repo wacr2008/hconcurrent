@@ -107,11 +107,11 @@ func (c *Concurrent) Stop() {
 //Destroy stop&destroy channels
 func (c *Concurrent) Destroy() {
 	c.lock.Lock()
+	defer c.lock.Unlock()
 	if c.destroyed {
 		return
 	}
 	c.destroy()
-	c.lock.Unlock()
 }
 
 func (c *Concurrent) destroy() {
