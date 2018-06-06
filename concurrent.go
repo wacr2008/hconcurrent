@@ -73,6 +73,23 @@ func (c *Concurrent) Input(i interface{}) bool {
 	if !c.started {
 		return false
 	}
+	select {
+	case c.concurrentItems[0].inputChan <- i:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c *Concurrent) MustInput(i interface{}) bool {
+	if i == nil {
+		return true
+	}
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+	if !c.started {
+		return false
+	}
 	c.concurrentItems[0].inputChan <- i
 	return true
 }
