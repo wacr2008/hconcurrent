@@ -10,7 +10,6 @@ type Concurrent struct {
 	concurrentItems []*concurrentItem
 	inputChan       chan interface{}
 	started         bool
-	destroyed       bool
 }
 
 func NewConcurrent(
@@ -119,24 +118,6 @@ func (c *Concurrent) Stop() {
 	c.lock.Lock()
 	c.stop()
 	c.lock.Unlock()
-}
-
-//Destroy stop&destroy channels
-func (c *Concurrent) Destroy() {
-	c.lock.Lock()
-	defer c.lock.Unlock()
-	if c.destroyed {
-		return
-	}
-	c.destroy()
-}
-
-func (c *Concurrent) destroy() {
-	c.stop()
-	for _, item := range c.concurrentItems {
-		item.destroy()
-	}
-	c.destroyed = true
 }
 
 func (c *Concurrent) stop() {

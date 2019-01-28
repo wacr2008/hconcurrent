@@ -31,9 +31,12 @@ func TestConcurrent(t *testing.T) {
 	for i := 0; i < len(inputs); i++ {
 		c.Input(inputs[i])
 	}
-	c.Stop()
-	c.Destroy()
 
+	time.Sleep(100 * time.Millisecond)
+	c.Stop()
+
+	l.Lock()
+	defer l.Unlock()
 	for i := 0; i < len(inputs); i++ {
 		n := inputs[i] + listCount
 		if m[n] != n {

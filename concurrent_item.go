@@ -6,7 +6,6 @@ import (
 
 type concurrentItem struct {
 	lock        *sync.Mutex
-	wait        *sync.WaitGroup
 	inputChan   chan interface{}
 	outputChan  chan interface{}
 	doFuncCount int
@@ -22,7 +21,6 @@ func newConcurrentItem(
 ) *concurrentItem {
 	return &concurrentItem{
 		lock:        new(sync.Mutex),
-		wait:        new(sync.WaitGroup),
 		inputChan:   inputChan,
 		doFuncCount: doFuncCount,
 		doFunc:      doFunc,
@@ -42,11 +40,9 @@ func (ci *concurrentItem) start() {
 }
 
 func (ci *concurrentItem) f() {
-	ci.wait.Add(1)
 	for {
 		v := <-ci.inputChan
 		if v == nil {
-			ci.wait.Done()
 			return
 		}
 		i := ci.doFunc(v)
@@ -62,12 +58,6 @@ func (ci *concurrentItem) stop() {
 	ci.lock.Unlock()
 }
 
-func (ci *concurrentItem) destroy() {
-	ci.lock.Lock()
-	ci.destroyNoLock()
-	ci.lock.Unlock()
-}
-
 func (ci *concurrentItem) stopNoLock() {
 	if !ci.started {
 		return
@@ -75,13 +65,5 @@ func (ci *concurrentItem) stopNoLock() {
 	for i := 0; i < ci.doFuncCount; i++ {
 		ci.inputChan <- nil
 	}
-	ci.wait.Wait()
 	ci.started = false
-}
-
-func (ci *concurrentItem) destroyNoLock() {
-	if ci.started {
-		ci.stopNoLock()
-	}
-	close(ci.inputChan)
 }
