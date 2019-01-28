@@ -67,11 +67,6 @@ func (c *Concurrent) Input(i interface{}) bool {
 	if i == nil {
 		return true
 	}
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	if !c.started {
-		return false
-	}
 	select {
 	case c.concurrentItems[0].inputChan <- i:
 		return true
@@ -84,11 +79,6 @@ func (c *Concurrent) MustInput(i interface{}) bool {
 	if i == nil {
 		return true
 	}
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	if !c.started {
-		return false
-	}
 	c.concurrentItems[0].inputChan <- i
 	return true
 }
@@ -100,11 +90,6 @@ func (c *Concurrent) InputWithTimeout(i interface{}, timeout time.Duration) bool
 func (c *Concurrent) InputWithTimer(i interface{}, t *time.Timer) bool {
 	if i == nil {
 		return true
-	}
-	c.lock.RLock()
-	defer c.lock.RUnlock()
-	if !c.started {
-		return false
 	}
 	select {
 	case c.concurrentItems[0].inputChan <- i:
