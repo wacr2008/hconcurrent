@@ -1,69 +1,51 @@
 package hconcurrent
 
-import (
-	"sync"
-)
+import "sync"
 
 type concurrentItem struct {
-	lock        *sync.Mutex
-	inputChan   chan interface{}
-	outputChan  chan interface{}
-	doFuncCount int
-	doFunc      func(interface{}) interface{}
-	started     bool
+	inputChan      chan interface{}
+	outputChan     chan interface{}
+	stopChan       chan *sync.WaitGroup
+	goroutineCount int
+	handle         func(interface{}) interface{}
 }
 
-func newConcurrentItem(
-	inputChan chan interface{},
-	doFuncCount int,
-	doFunc func(interface{}) interface{},
-	outputChan chan interface{},
-) *concurrentItem {
+func newConcurrentItem(option Option) *concurrentItem {
 	return &concurrentItem{
-		lock:        new(sync.Mutex),
-		inputChan:   inputChan,
-		doFuncCount: doFuncCount,
-		doFunc:      doFunc,
-		outputChan:  outputChan,
+		inputChan:      make(chan interface{}, option.channelSize),
+		stopChan:       make(chan *sync.WaitGroup, option.goroutineCount),
+		goroutineCount: option.goroutineCount,
+		handle:         option.handle,
 	}
+}
+
+func (ci *concurrentItem) setOutputChan(c chan interface{}) {
+	ci.outputChan = c
 }
 
 func (ci *concurrentItem) start() {
-	ci.lock.Lock()
-	if !ci.started {
-		for i := 0; i < ci.doFuncCount; i++ {
-			go ci.f()
-		}
-		ci.started = true
+	for i := 0; i < ci.goroutineCount; i++ {
+		go ci.f()
 	}
-	ci.lock.Unlock()
 }
 
 func (ci *concurrentItem) f() {
 	for {
-		v := <-ci.inputChan
-		if v == nil {
+		select {
+		case v := <-ci.inputChan:
+			r := ci.handle(v)
+			if ci.outputChan != nil {
+				ci.outputChan <- r
+			}
+		case w := <-ci.stopChan:
+			w.Done()
 			return
 		}
-		i := ci.doFunc(v)
-		if i != nil && ci.outputChan != nil {
-			ci.outputChan <- i
-		}
 	}
 }
 
-func (ci *concurrentItem) stop() {
-	ci.lock.Lock()
-	ci.stopNoLock()
-	ci.lock.Unlock()
-}
-
-func (ci *concurrentItem) stopNoLock() {
-	if !ci.started {
-		return
+func (ci *concurrentItem) stop(w *sync.WaitGroup) {
+	for i := 0; i < ci.goroutineCount; i++ {
+		ci.stopChan <- w
 	}
-	for i := 0; i < ci.doFuncCount; i++ {
-		ci.inputChan <- nil
-	}
-	ci.started = false
 }

@@ -5,50 +5,70 @@ import (
 	"time"
 )
 
+type Option struct {
+	channelSize    int
+	goroutineCount int
+	handle         func(interface{}) interface{}
+}
+
+func NewOption(channelSize, goroutineCount int, handle func(interface{}) interface{}) Option {
+	return Option{channelSize: channelSize, goroutineCount: goroutineCount, handle: handle}
+}
+
 type Concurrent struct {
-	lock            *sync.RWMutex
+	lock            *sync.Mutex
 	concurrentItems []*concurrentItem
 	inputChan       chan interface{}
 	started         bool
 }
 
-func NewConcurrent(
-	inputChanSize int,
-	doFuncCount int,
-	doFunc func(interface{}) interface{},
-) *Concurrent {
-	return NewConcurrent2(inputChanSize, doFuncCount, doFunc)
+func NewConcurrent(channelSize int, goroutineCount int, handle func(interface{}) interface{}) *Concurrent {
+	return NewConcurrentWithOptions(NewOption(channelSize, goroutineCount, handle))
 }
 
-//NewConcurrent2 v:intputChan->doFuncCount->doFunc->midChan->doFuncCount->doFunc->midChan->....->doFuncCount->doFunc
-func NewConcurrent2(v ...interface{}) *Concurrent {
+//
+//                     |-      -|                    |-      -|                    |-      -|
+//                     | handle |                    | handle |                    | handle |
+//                     | handle |                    | handle |                    | handle |
+//                     | handle |                    | handle |                    | handle |
+// >>> input chan >>> -| handle |- >>> out chan >>> -| handle |- >>> out chan >>> -| handle |
+//    (channelSize)    | handle |    (channelSize)   | handle |    (channelSize)   | handle |
+//                     | handle |                    | handle |                    | handle |
+//                     |   .    |                    |   .    |                    |   .    |
+//                     |   .    |                    |   .    |                    |   .    |
+//                     |-  .   -|                    |-  .   -|                    |-  .   -|
+//               goroutineCount x handle       goroutineCount x handle       goroutineCount x handle
+//
+func NewConcurrentWithOptions(options ...Option) *Concurrent {
 	c := &Concurrent{
-		lock: new(sync.RWMutex),
+		lock: new(sync.Mutex),
 	}
-	c.initConcurrentItems(v...)
+	c.initConcurrentItems(options)
 	return c
 }
 
-func (c *Concurrent) initConcurrentItems(v ...interface{}) {
-	if c.concurrentItems != nil {
-		return
-	}
+func (c *Concurrent) initConcurrentItems(options []Option) {
 	c.concurrentItems = []*concurrentItem{}
-	var outputChan chan interface{}
-	for i := len(v) - 1; i > -1; i -= 3 {
-		f := v[i].(func(interface{}) interface{})
-		count := v[i-1].(int)
-		size := v[i-2].(int)
-		ch := make(chan interface{}, size)
-		c.concurrentItems = append([]*concurrentItem{
-			newConcurrentItem(ch, count, f, outputChan),
-		}, c.concurrentItems...)
+	var preItem *concurrentItem
+	for _, op := range options {
+		if op.channelSize <= 0 || op.goroutineCount <= 0 || op.handle == nil {
+			panic("init concurrent fail,option should be:channelSize>0,goroutineCount>0,handle!=nil")
+		}
+		item := newConcurrentItem(op)
+		c.concurrentItems = append(c.concurrentItems, item)
 
-		outputChan = ch
+		if preItem != nil {
+			preItem.setOutputChan(item.inputChan)
+		}
+		if c.inputChan == nil {
+			c.inputChan = item.inputChan
+		}
+
+		preItem = item
 	}
 }
 
-func (c *Concurrent) Run() {
+func (c *Concurrent) Start() {
 	c.lock.Lock()
 	defer c.lock.Unlock()
 	if !c.started {
@@ -64,11 +84,8 @@ func (c *Concurrent) run() {
 }
 
 func (c *Concurrent) Input(i interface{}) bool {
-	if i == nil {
-		return true
-	}
 	select {
-	case c.concurrentItems[0].inputChan <- i:
+	case c.inputChan <- i:
 		return true
 	default:
 		return false
@@ -76,10 +93,7 @@ func (c *Concurrent) Input(i interface{}) bool {
 }
 
 func (c *Concurrent) MustInput(i interface{}) bool {
-	if i == nil {
-		return true
-	}
-	c.concurrentItems[0].inputChan <- i
+	c.inputChan <- i
 	return true
 }
 
@@ -88,11 +102,8 @@ func (c *Concurrent) InputWithTimeout(i interface{}, timeout time.Duration) bool
 }
 
 func (c *Concurrent) InputWithTimer(i interface{}, t *time.Timer) bool {
-	if i == nil {
-		return true
-	}
 	select {
-	case c.concurrentItems[0].inputChan <- i:
+	case c.inputChan <- i:
 		return true
 	case <-t.C:
 		return false
@@ -101,16 +112,15 @@ func (c *Concurrent) InputWithTimer(i interface{}, t *time.Timer) bool {
 
 func (c *Concurrent) Stop() {
 	c.lock.Lock()
-	c.stop()
-	c.lock.Unlock()
-}
-
-func (c *Concurrent) stop() {
+	defer c.lock.Unlock()
 	if !c.started {
 		return
 	}
+	w := new(sync.WaitGroup)
 	for _, item := range c.concurrentItems {
-		item.stop()
+		w.Add(item.goroutineCount)
+		item.stop(w)
 	}
+	w.Wait()
 	c.started = false
 }

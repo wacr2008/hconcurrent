@@ -14,20 +14,20 @@ func TestConcurrent(t *testing.T) {
 	m := map[int]int{}
 	l := new(sync.Mutex)
 
-	c := NewConcurrent2(
-		inputChanSize, doFuncCount, testDo,
-		inputChanSize, doFuncCount, testDo,
-		inputChanSize, doFuncCount, testDo,
-		inputChanSize, doFuncCount, func(i interface{}) interface{} {
+	c := NewConcurrentWithOptions(
+		NewOption(inputChanSize, doFuncCount, testDo),
+		NewOption(inputChanSize, doFuncCount, testDo),
+		NewOption(inputChanSize, doFuncCount, testDo),
+		NewOption(inputChanSize, doFuncCount, func(i interface{}) interface{} {
 			l.Lock()
 			defer l.Unlock()
 			n := i.(int)
 			m[n] = n
 			return n
-		},
+		}),
 	)
 
-	c.Run()
+	c.Start()
 	for i := 0; i < len(inputs); i++ {
 		c.Input(inputs[i])
 	}
