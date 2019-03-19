@@ -120,7 +120,7 @@ func (c *Concurrent) Stop() {
 	for _, item := range c.concurrentItems {
 		w.Add(item.goroutineCount)
 		item.stop(w)
+		w.Wait()
 	}
-	w.Wait()
 	c.started = false
 }
